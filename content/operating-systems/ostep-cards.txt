@@ -171,3 +171,82 @@ A: The register context in a process data structure is used to hold the contents
 
 Q: What is a Process Control Block (PCB)?
 A: A Process Control Block (PCB) is a data structure that stores information about a process, also known as a process descriptor. It is used by the OS to keep track of all running programs in the system.
+
+---
+
+CHAPTER 5
+
+Q: What are the three main UNIX system calls for process creation and control?
+A: The three main UNIX system calls for process creation and control are fork(), exec(), and wait().
+
+Q: What is the purpose of the fork() system call in UNIX systems?
+A: The fork() system call in UNIX systems is used to create a new process, where the creator is called the parent and the newly created process is called the child. The child process is a nearly identical copy of the parent.
+
+Q: What are the roles of the wait() and exec() system calls in UNIX systems?
+A: The wait() system call allows a parent process to wait for its child process to complete execution, while the exec() family of system calls allows a child process to break free from its similarity to its parent and execute an entirely new program.
+
+5.1
+
+Q: What is the purpose of the fork() system call and what is unusual about it?
+A: The fork() system call is used to create a new process, with the newly-created process being an (almost) exact copy of the calling process. The unusual aspect is that the child process doesn't start running at main(), but comes into life as if it had called fork() itself.
+
+Q: How does the fork() system call differentiate between parent and child processes in its return value?
+A: The fork() system call differentiates between parent and child processes by returning the PID of the newly-created child to the parent process, while returning a value of zero to the child process.
+
+Q: What causes the non-determinism in the output of a program using the fork() system call?
+A: The non-determinism in the output of a program using the fork() system call is caused by the CPU scheduler, which determines which process (parent or child) runs at a given moment in time. Since the scheduler is complex, it is difficult to predict which process will run first.
+
+5.2
+
+Q: What is the purpose of the wait() system call?
+A: The wait() system call allows a parent process to delay its execution until its child process finishes executing.
+
+Q: How does adding a wait() call make the output of a program with fork() deterministic?
+A: By adding a wait() call, the parent process will always wait for the child process to finish executing before it continues, ensuring that the child process always prints its output first, regardless of which process runs first.
+
+Q: What happens when a parent process calls wait() if the child process is still executing?
+A: When a parent process calls wait() while the child process is still executing, the parent process will be blocked and not continue its execution until the child process has completed and exited.
+
+5.3
+
+Q: What is the purpose of the exec() system call?
+A: The exec() system call is used to run a different program within the current process, replacing the current code segment and static data with those from the new program, and re-initializing the heap, stack, and other parts of the memory space.
+
+Q: How does exec() differ from fork() in terms of process creation?
+A: While fork() creates a new process as a nearly identical copy of the parent process, exec() does not create a new process; instead, it transforms the currently running program into a different running program.
+
+Q: What happens to the current program after a successful call to exec()?
+A: After a successful call to exec(), the current program is replaced with the new program, and it is as if the original program never ran. A successful call to exec() never returns.
+
+5.4
+
+Q: Why is the separation of fork() and exec() essential in building a UNIX shell?
+A: The separation of fork() and exec() allows the shell to run code after the call to fork() but before the call to exec(), enabling it to alter the environment of the about-to-be-run program and implement a variety of interesting features.
+
+Q: How does the shell implement output redirection using fork() and exec()?
+A: The shell creates a child process with fork(), and before calling exec(), it closes the standard output and opens the specified output file. As a result, any output from the soon-to-be-running program is sent to the file instead of the screen.
+
+Q: How are UNIX pipes implemented, and what is their purpose?
+A: UNIX pipes are implemented using the pipe() system call. They connect the output of one process to an in-kernel pipe (queue) and the input of another process to the same pipe, allowing the output of one process to be seamlessly used as input to the next and enabling long and useful chains of commands to be created.
+
+5.5
+
+Q: What is the purpose of the kill() system call in UNIX systems?
+A: The kill() system call is used to send signals to a process, including directives to pause, die, and other useful imperatives.
+
+Q: How is the security and usability of a multi-user system maintained in UNIX systems?
+A: UNIX systems have a strong conception of the notion of a user. Users log in with credentials and can only control their own processes, while the operating system parcels out resources (such as CPU, memory, and disk) to each user and their processes to meet overall system goals.
+
+Q: What are man pages and why are they important for systems programmers?
+A: Man pages are the original form of documentation on UNIX systems, created before the web existed. Reading man pages is a key step in the growth of a systems programmer, as they contain useful information about system calls, shells, and potential errors or return values.
+
+5.6
+
+Q: What command allows you to see which processes are running in UNIX systems?
+A: The "ps" command allows you to see which processes are running in UNIX systems.
+
+Q: What is the purpose of the "top" command in UNIX systems?
+A: The "top" command displays the processes of the system and how much CPU and other resources they are consuming.
+
+Q: What is the role of the superuser (root) in UNIX-based systems?
+A: In UNIX-based systems, the superuser (root) has special abilities, such as killing arbitrary processes and running powerful commands like shutdown. The superuser can administer the system without the limitations of regular users.
