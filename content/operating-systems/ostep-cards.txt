@@ -103,3 +103,71 @@ A2: A system call is a special hardware instruction and hardware state that allo
 
 Q3: What was the major innovation in the era of multiprogramming?
 A3: In the era of multiprogramming, operating systems began loading multiple jobs into memory and rapidly switching between them, improving CPU utilization and enabling more efficient use of machine resources.
+
+---
+
+CHAPTER 4
+
+Q: What is the basic abstraction provided by an OS and how does it create the illusion of many CPUs?
+A: The basic abstraction provided by an OS is the process, which is a running program. The OS creates the illusion of many CPUs by virtualizing the CPU through time-sharing, allowing multiple processes to run concurrently by quickly switching between them.
+
+Q: What are the two components needed for implementing CPU virtualization in an OS?
+A: The two components needed are mechanisms, which are low-level methods or protocols that implement a needed piece of functionality, and policies, which are algorithms for making decisions within the OS.
+
+Q: What is the primary technique used by an OS to share resources among multiple entities?
+A: The primary technique used is time-sharing, which involves allowing a resource to be used for a short period by one entity and then another, enabling many entities to share the resource.
+
+4.1
+
+Q: What is a process in the context of an OS?
+A: A process is the abstraction provided by the OS for a running program, encompassing its machine state, including memory, registers, and I/O information.
+
+Q: What are the key components of a process's machine state?
+A: The key components of a process's machine state are its address space (memory), registers (including special registers like the program counter, stack pointer, and frame pointer), and I/O information (such as open files).
+
+Q: What is the design paradigm that separates high-level policies from low-level mechanisms in operating systems?
+A: The design paradigm is called "separating policy and mechanism," which enables easier changes to policies without rethinking the mechanism, promoting modularity in software design.
+
+4.2
+
+Q: What are the basic components of a Process API in an operating system?
+A: The basic components of a Process API include Create, Destroy, Wait, Miscellaneous Control, and Status.
+
+Q: What is the purpose of the Create function in the Process API?
+A: The Create function allows the operating system to create new processes, such as when a user types a command into the shell or double-clicks on an application icon.
+
+Q: What are some examples of Miscellaneous Control functions in the Process API?
+A: Examples of Miscellaneous Control functions include suspending a process (stopping it from running for a while) and resuming it (continuing its execution).
+
+4.3
+
+Q: What is the first step in transforming a program into a process?
+A: The first step in transforming a program into a process is loading the program's code and any static data into memory, in the address space of the process.
+
+Q: What does the OS need to do before running a process, aside from loading code and static data into memory?
+A: The OS needs to allocate memory for the program's run-time stack, initialize the stack with arguments, allocate memory for the program's heap, and perform other initialization tasks related to input/output (I/O).
+
+Q: How does the OS start program execution after setting the stage?
+A: The OS starts program execution by jumping to the main() routine, transferring control of the CPU to the newly-created process, and thus beginning the program's execution.
+
+4.4
+
+Q: What are the three simplified states a process can be in at a given time?
+A: The three simplified states a process can be in are Running, Ready, and Blocked.
+
+Q: What does the Running state mean for a process?
+A: In the Running state, a process is executing instructions on a processor.
+
+Q: What does the Blocked state mean for a process?
+A: In the Blocked state, a process has performed an operation that makes it not ready to run until some other event takes place, such as waiting for an I/O request to complete.
+
+4.5
+
+Q: What is the main data structure used by the OS to track the state of each process?
+A: The main data structure used by the OS to track the state of each process is the Process List, also called the task list.
+
+Q: What is the register context in a process data structure used for?
+A: The register context in a process data structure is used to hold the contents of a stopped process's registers. When a process is stopped, its registers are saved to this memory location, allowing the OS to resume running the process by restoring the register values.
+
+Q: What is a Process Control Block (PCB)?
+A: A Process Control Block (PCB) is a data structure that stores information about a process, also known as a process descriptor. It is used by the OS to keep track of all running programs in the system.
