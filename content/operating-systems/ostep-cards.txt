@@ -1,5 +1,3 @@
-PROMPT
-
 You are AnkiGPT, a large language model trained by OpenAI to summarize large amounts of texts into a flashcard question-and-answer format.
 
 Please summarize the chapter CHAPTER-TO-SUMMARIZE into a single most important point, in the flashcard question-and-answer format that will fit in an Anki card. Then add the second and third most important points, in the same format.
@@ -23,230 +21,468 @@ A: register context
 
 ---
 
-CHAPTER-TO-SUMMARIZE
+# 8.5 Tuning MLFQ And Other Issues
 
----
+A few other issues arise with MLFQ scheduling. One big question is how to parameterize such a scheduler. For example, how many queues should there be? How big should the time slice be per queue? How often should priority be boosted in order to avoid starvation and account for changes in behavior? There are no easy answers to these questions, and thus only some experience with workloads and subsequent tuning of the scheduler will lead to a satisfactory balance.
+
+For example, most MLFQ variants allow for varying time-slice length across different queues. The high-priority queues are usually given short time slices; they are comprised of interactive jobs, after all, and thus quickly alternating between them makes sense (e.g., 10 or fewer millisec- onds). The low-priority queues, in contrast, contain long-running jobs that are CPU-bound; hence, longer time slices work well (e.g., 100s of ms). Figure 8.7 (page 8) shows an example in which two jobs run for 20 ms at the highest queue (with a 10-ms time slice), 40 ms in the middle (20-ms time slice), and with a 40-ms time slice at the lowest.
+
+The Solaris MLFQ implementation — the Time-Sharing scheduling class, or TS — is particularly easy to configure; it provides a set of tables that determine exactly how the priority of a process is altered through- out its lifetime, how long each time slice is, and how often to boost the priority of a job [AD00]; an administrator can muck with this table in or- der to make the scheduler behave in different ways. Default values for the table are 60 queues, with slowly increasing time-slice lengths from 20 milliseconds (highest priority) to a few hundred milliseconds (lowest), and priorities boosted around every 1 second or so.
+
+Other MLFQ schedulers don’t use a table or the exact rules described in this chapter; rather they adjust priorities using mathematical formu- lae. For example, the FreeBSD scheduler (version 4.3) uses a formula to calculate the current priority level of a job, basing it on how much CPU the process has used [LM+89]; in addition, usage is decayed over time, providing the desired priority boost in a different manner than described herein. See Epema’s paper for an excellent overview of such decay-usage algorithms and their properties [E95].
+
+Finally, many schedulers have a few other features that you might en- counter. For example, some schedulers reserve the highest priority levels for operating system work; thus typical user jobs can never obtain the highest levels of priority in the system. Some systems also allow some user advice to help set priorities; for example, by using the command-line utility nice you can increase or decrease the priority of a job (somewhat) and thus increase or decrease its chances of running at any given time. See the man page for more.
+
+TIP: AVOID VOO-DOO CONSTANTS (OUSTERHOUT’S LAW)
+Avoiding voo-doo constants is a good idea whenever possible. Unfor- tunately, as in the example above, it is often difficult. One could try to make the system learn a good value, but that too is not straightforward. The frequent result: a configuration file filled with default parameter val- ues that a seasoned administrator can tweak when something isn’t quite working correctly. As you can imagine, these are often left unmodified, and thus we are left to hope that the defaults work well in the field. This tip brought to you by our old OS professor, John Ousterhout, and hence we call it Ousterhout’s Law.
+
+TIP: USE ADVICE WHERE POSSIBLE
+As the operating system rarely knows what is best for each and every process of the system, it is often useful to provide interfaces to allow users or administrators to provide some hints to the OS. We often call such hints advice, as the OS need not necessarily pay attention to it, but rather might take the advice into account in order to make a better decision. Such hints are useful in many parts of the OS, including the scheduler (e.g., with nice), memory manager (e.g., madvise), and file system (e.g.,
+informed prefetching and caching [P+95]).
+
+
 
 CHAPTER 2
 
-Q1: What is the primary goal of an operating system (OS)?
-A1: The primary goal of an OS is to make the system easy to use by virtualizing resources like the processor, memory, and disk.
+Q1: The primary way the OS makes the system easy to use and operates efficiently is through a general technique called ___.
+A1: virtualization
 
-Q2: What is the crux of the problem when building an operating system?
-A2: The crux of the problem is to determine how the operating system virtualizes resources efficiently and with the necessary hardware support.
+Q2: The operating system is sometimes known as a ___ because it allows many programs to share resources like CPU, memory, and devices.
+A2: resource manager
 
-Q3: What are some of the important topics that this chapter will cover?
-A3: Important topics include virtualization of the CPU and memory, concurrency, and persistence via devices and file systems.
+Q3: The operating system provides interfaces, or ___, that allow users to make use of the virtual machine's features, such as running a program or accessing a file.
+A3: APIs
 
 2.1
 
-Q1: What is the process of virtualizing the CPU?
-A1: Virtualizing the CPU is the process of creating the illusion of a large number of virtual CPUs from a single CPU or a small set of them, allowing multiple programs to seemingly run simultaneously.
+Q1: Turning a single CPU (or a small set of them) into a seemingly infinite number of CPUs and allowing many programs to seemingly run at once is called ___.
+A1: virtualizing the CPU
 
-Q2: What is the role of operating system APIs?
-A2: Operating system APIs provide interfaces for users to communicate their desires to the OS, such as running, stopping, or managing programs.
+Q2: To run programs, stop them, and otherwise tell the OS which programs to run, there need to be some interfaces, also known as ___.
+A2: APIs
 
-Q3: What is the purpose of OS policies?
-A3: OS policies are used to answer questions and make decisions related to resource allocation and management, such as which program should run when multiple programs want to run at the same time.
+Q3: The operating system answers questions like which program should run at a particular time through the use of a ___.
+A3: policy
 
 2.2
 
-Q1: What is the purpose of virtualizing memory in an operating system?
-A1: The purpose of virtualizing memory is to create the illusion that each running program has its own private memory, while in reality, physical memory is a shared resource managed by the operating system.
+Q1: Each process accesses its own private ___ which the OS maps onto the physical memory of the machine.
+A1: virtual address space
 
-Q2: What is a process's virtual address space?
-A2: A process's virtual address space, or address space, is its own private memory that the operating system maps onto the physical memory of the machine.
+Q2: A memory reference within one running program does not affect the address space of other processes or the OS, creating an illusion that each program has ___ all to itself.
+A2: physical memory
 
-Q3: How does virtualizing memory affect memory references within running programs?
-A3: Virtualizing memory ensures that memory references within one running program do not affect the address space of other processes or the operating system itself.
+Q3: Memory is accessed all the time when a program is running, with ___ being accessed on each instruction fetch.
+A3: memory
 
 2.3
 
-Q1: What is the main theme of concurrency in operating systems and multi-threaded programs?
-A1: Concurrency refers to the problems that arise when working on many things at once within the same program, such as managing multiple processes or threads and ensuring correct execution.
+Q1: When there are many concurrently executing threads within the same memory space, the problem of ___ arises, which is addressed in great detail in the second part of the book.
+A1: concurrency
 
-Q2: What is a thread in the context of multi-threaded programs?
-A2: A thread is a function running within the same memory space as other functions, with more than one of them active at a time.
+Q2: A ___ is a function running within the same memory space as other functions, with more than one of them active at a time.
+A2: thread
 
-Q3: Why do concurrency problems occur when threads share resources like a counter?
-A3: Concurrency problems occur because instructions are not executed atomically (all at once), which can lead to unexpected and inconsistent outcomes when multiple threads access shared resources.
+Q3: The problems of concurrency first arose within the ___ itself, which juggles many things at once, such as running one process, then another.
+A3: operating system
 
 2.4
 
-Q1: What is the main theme of persistence in operating systems?
-A1: Persistence refers to the ability to store data permanently, even in the face of power loss or system crashes, using hardware and software to manage and store data on I/O devices like hard drives or SSDs.
+Q1: In system memory, data can be easily lost as devices like DRAM store values in a volatile manner, so we need hardware and software to store data ___, which is critical to any system.
+A1: persistently
 
-Q2: What is the role of the file system in the operating system?
-A2: The file system is responsible for managing the storage and retrieval of files on a disk, ensuring their efficient and reliable storage and enabling sharing of information between different processes.
+Q2: The ___ in the operating system usually manages the disk and is responsible for storing any files the user creates in a reliable and efficient manner on the disks of the system.
+A2: file system
 
-Q3: What are some techniques used by file systems to ensure data reliability and high performance?
-A3: File systems may use techniques such as delayed writes, journaling or copy-on-write, and various data structures and access methods to optimize performance, maintain consistency, and recover from failures.
+Q3: To handle the problems of system crashes during writes, most file systems incorporate some kind of intricate write protocol, such as ___ or copy-on-write, carefully ordering writes to disk to ensure recovery to a reasonable state afterwards.
+A3: journaling
 
 2.5
 
-Q1: What is the primary goal when designing and implementing an operating system?
-A1: The primary goal is to build up abstractions that make the system convenient and easy to use while managing physical resources, virtualization, concurrency, and persistent storage.
+Q: Early operating systems were primarily a set of ___ of commonly-used functions to make life easier for developers.
+A: libraries
 
-Q2: How does an operating system aim to provide high performance?
-A2: An operating system aims to provide high performance by minimizing overheads, which can arise in the form of extra time (more instructions) or extra space (in memory or on disk).
+Q2: The idea of a ___ was invented to add a special pair of hardware instructions and hardware state, making the transition into the OS a more formal, controlled process.
+A: system call
 
-Q3: What are some other design goals for an operating system?
-A3: Other design goals include providing protection between applications and the OS, ensuring reliability, achieving energy efficiency, enhancing security, and supporting mobility across different devices.
+Q3: With the desire to make better use of machine resources, the era of ___ became commonplace, where the OS would load multiple jobs into memory and switch rapidly between them to improve CPU utilization.
+A: multiprogramming
 
-2.6
 
-Q1: What was the primary function of early operating systems?
-A1: Early operating systems primarily functioned as a set of libraries for commonly-used functions, such as low-level I/O handling code, to make life easier for developers.
-
-Q2: What is a system call and why was it invented?
-A2: A system call is a special hardware instruction and hardware state that allows a controlled process transition into the OS. It was invented to provide a formal, controlled way to access OS routines, ensuring privacy and security.
-
-Q3: What was the major innovation in the era of multiprogramming?
-A3: In the era of multiprogramming, operating systems began loading multiple jobs into memory and rapidly switching between them, improving CPU utilization and enabling more efficient use of machine resources.
-
----
 
 CHAPTER 4
 
-Q: What is the basic abstraction provided by an OS and how does it create the illusion of many CPUs?
-A: The basic abstraction provided by an OS is the process, which is a running program. The OS creates the illusion of many CPUs by virtualizing the CPU through time-sharing, allowing multiple processes to run concurrently by quickly switching between them.
+Q: The OS creates the illusion of many virtual CPUs by using a technique known as ___ sharing of the CPU, allowing users to run as many concurrent processes as they would like.
+A: time
 
-Q: What are the two components needed for implementing CPU virtualization in an OS?
-A: The two components needed are mechanisms, which are low-level methods or protocols that implement a needed piece of functionality, and policies, which are algorithms for making decisions within the OS.
+Q: To implement virtualization of the CPU, the OS uses low-level machinery called ___ and high-level intelligence in the form of ___.
+A: mechanisms, policies
 
-Q: What is the primary technique used by an OS to share resources among multiple entities?
-A: The primary technique used is time-sharing, which involves allowing a resource to be used for a short period by one entity and then another, enabling many entities to share the resource.
+Q: A ___ list contains information about all processes in the system, with each entry found in a structure called a process control block (PCB).
+A: process
 
 4.1
 
-Q: What is a process in the context of an OS?
-A: A process is the abstraction provided by the OS for a running program, encompassing its machine state, including memory, registers, and I/O information.
+Q: A ___ is the abstraction provided by the OS for a running program, encompassing its machine state, including memory, registers, and I/O information.
+A: process
 
-Q: What are the key components of a process's machine state?
-A: The key components of a process's machine state are its address space (memory), registers (including special registers like the program counter, stack pointer, and frame pointer), and I/O information (such as open files).
+Q: The memory a process can address is called its ___ space, and it is part of the process's machine state.
+A: address
 
-Q: What is the design paradigm that separates high-level policies from low-level mechanisms in operating systems?
-A: The design paradigm is called "separating policy and mechanism," which enables easier changes to policies without rethinking the mechanism, promoting modularity in software design.
+Q: In many operating systems, a common design paradigm is to separate high-level ___ from their low-level ___.
+A: policies, mechanisms
 
 4.2
 
-Q: What are the basic components of a Process API in an operating system?
-A: The basic components of a Process API include Create, Destroy, Wait, Miscellaneous Control, and Status.
+Q: The ___ function in the Process API allows the operating system to create new processes, such as when a user types a command into the shell or double-clicks on an application icon.
+A: Create
 
-Q: What is the purpose of the Create function in the Process API?
-A: The Create function allows the operating system to create new processes, such as when a user types a command into the shell or double-clicks on an application icon.
+Q: In the Process API, the ___ function enables users to forcefully destroy processes that do not exit by themselves.
+A: Destroy
 
-Q: What are some examples of Miscellaneous Control functions in the Process API?
-A: Examples of Miscellaneous Control functions include suspending a process (stopping it from running for a while) and resuming it (continuing its execution).
+Q: The Process API typically includes a ___ function that allows users to wait for a process to stop running.
+A: Wait
 
 4.3
 
-Q: What is the first step in transforming a program into a process?
-A: The first step in transforming a program into a process is loading the program's code and any static data into memory, in the address space of the process.
+Q: To transform a program into a process, the OS first needs to load the program's code and any static data into the ___ of the process.
+A: address space
 
-Q: What does the OS need to do before running a process, aside from loading code and static data into memory?
-A: The OS needs to allocate memory for the program's run-time stack, initialize the stack with arguments, allocate memory for the program's heap, and perform other initialization tasks related to input/output (I/O).
+Q: Before running a process, the operating system must allocate memory for the program's ___ for local variables, function parameters, and return addresses.
+A: run-time stack
 
-Q: How does the OS start program execution after setting the stage?
-A: The OS starts program execution by jumping to the main() routine, transferring control of the CPU to the newly-created process, and thus beginning the program's execution.
+Q: The OS transfers control of the CPU to the newly-created process and starts the program running at the entry point, which is typically the ___ function.
+A: main
 
 4.4
 
-Q: What are the three simplified states a process can be in at a given time?
-A: The three simplified states a process can be in are Running, Ready, and Blocked.
+Q: In a simplified view, a process can be in one of three states: Running, where it is executing instructions; ___, where it is ready to run but not running at the moment; and Blocked, where it is not ready to run until some other event takes place.
+A: Ready
 
-Q: What does the Running state mean for a process?
-A: In the Running state, a process is executing instructions on a processor.
+Q: When a process moves from the ready state to the running state, it is considered to be ___ by the OS.
+A: scheduled
 
-Q: What does the Blocked state mean for a process?
-A: In the Blocked state, a process has performed an operation that makes it not ready to run until some other event takes place, such as waiting for an I/O request to complete.
+Q: When a process moves from the running state to the ready state, it is considered to be ___ by the OS.
+A: descheduled
 
 4.5
 
-Q: What is the main data structure used by the OS to track the state of each process?
-A: The main data structure used by the OS to track the state of each process is the Process List, also called the task list.
+Q: The OS must track the state of each process using key data structures, including a ___ for all processes that are ready and additional information to track which process is currently running.
+A: process list
 
-Q: What is the register context in a process data structure used for?
-A: The register context in a process data structure is used to hold the contents of a stopped process's registers. When a process is stopped, its registers are saved to this memory location, allowing the OS to resume running the process by restoring the register values.
+Q: In UNIX-based systems, when a process has exited but has not yet been cleaned up, it is placed in a final state called the ___ state.
+A: zombie
 
-Q: What is a Process Control Block (PCB)?
-A: A Process Control Block (PCB) is a data structure that stores information about a process, also known as a process descriptor. It is used by the OS to keep track of all running programs in the system.
+Q: Sometimes people refer to the individual structure that stores information about a process as a Process Control Block (PCB) or a ___.
+A: process descriptor
 
----
+
 
 CHAPTER 5
 
-Q: What are the three main UNIX system calls for process creation and control?
-A: The three main UNIX system calls for process creation and control are fork(), exec(), and wait().
+Q: In UNIX systems, the ___ system call is used to create a new process, with the creator being called the parent and the newly created process called the child.
+A: fork()
 
-Q: What is the purpose of the fork() system call in UNIX systems?
-A: The fork() system call in UNIX systems is used to create a new process, where the creator is called the parent and the newly created process is called the child. The child process is a nearly identical copy of the parent.
+Q: The ___ system call allows a parent to wait for its child to complete execution in UNIX systems.
+A: wait()
 
-Q: What are the roles of the wait() and exec() system calls in UNIX systems?
-A: The wait() system call allows a parent process to wait for its child process to complete execution, while the exec() family of system calls allows a child process to break free from its similarity to its parent and execute an entirely new program.
+Q: The ___ family of system calls allows a child process to break free from its similarity to its parent and execute an entirely new program in UNIX systems.
+A: exec()
 
 5.1
 
-Q: What is the purpose of the fork() system call and what is unusual about it?
-A: The fork() system call is used to create a new process, with the newly-created process being an (almost) exact copy of the calling process. The unusual aspect is that the child process doesn't start running at main(), but comes into life as if it had called fork() itself.
+Q: The ___ system call is used to create a new process in UNIX systems, with the new process being an (almost) exact copy of the calling process.
+A: fork()
 
-Q: How does the fork() system call differentiate between parent and child processes in its return value?
-A: The fork() system call differentiates between parent and child processes by returning the PID of the newly-created child to the parent process, while returning a value of zero to the child process.
+Q: In UNIX systems, the parent process receives the ___ of the newly-created child process as the return value of the fork() system call.
+A: PID
 
-Q: What causes the non-determinism in the output of a program using the fork() system call?
-A: The non-determinism in the output of a program using the fork() system call is caused by the CPU scheduler, which determines which process (parent or child) runs at a given moment in time. Since the scheduler is complex, it is difficult to predict which process will run first.
+Q: The non-deterministic nature of process execution order after the fork() system call is due to the decisions made by the ___.
+A: CPU scheduler
 
 5.2
 
-Q: What is the purpose of the wait() system call?
-A: The wait() system call allows a parent process to delay its execution until its child process finishes executing.
+Q: The ___ system call is used by a parent process to delay its execution until the child process finishes executing.
+A: wait()
 
-Q: How does adding a wait() call make the output of a program with fork() deterministic?
-A: By adding a wait() call, the parent process will always wait for the child process to finish executing before it continues, ensuring that the child process always prints its output first, regardless of which process runs first.
+Q: The wait() system call makes the output of a parent and child process more ___ because the parent will not proceed until the child has completed.
+A: deterministic
 
-Q: What happens when a parent process calls wait() if the child process is still executing?
-A: When a parent process calls wait() while the child process is still executing, the parent process will be blocked and not continue its execution until the child process has completed and exited.
+Q: The more complete sibling of the wait() system call is ___.
+A: waitpid()
 
 5.3
 
-Q: What is the purpose of the exec() system call?
-A: The exec() system call is used to run a different program within the current process, replacing the current code segment and static data with those from the new program, and re-initializing the heap, stack, and other parts of the memory space.
+Q: The ___ system call is used when you want to run a program that is different from the calling program, transforming the currently running program into a different running program.
+A: exec()
 
-Q: How does exec() differ from fork() in terms of process creation?
-A: While fork() creates a new process as a nearly identical copy of the parent process, exec() does not create a new process; instead, it transforms the currently running program into a different running program.
+Q: When a process calls exec(), it loads code and static data from the specified executable, overwriting its current ___ segment and re-initializing the heap, stack, and other parts of the memory space.
+A: code
 
-Q: What happens to the current program after a successful call to exec()?
-A: After a successful call to exec(), the current program is replaced with the new program, and it is as if the original program never ran. A successful call to exec() never returns.
+Q: After a successful call to exec() in the child process, it is almost as if the original program ___.
+A: never ran
 
 5.4
 
-Q: Why is the separation of fork() and exec() essential in building a UNIX shell?
-A: The separation of fork() and exec() allows the shell to run code after the call to fork() but before the call to exec(), enabling it to alter the environment of the about-to-be-run program and implement a variety of interesting features.
+Q: The separation of fork() and exec() in the UNIX shell allows the shell to run code after the call to fork() but before the call to exec(), enabling the alteration of the ___ of the about-to-be-run program and a variety of interesting features.
+A: environment
 
-Q: How does the shell implement output redirection using fork() and exec()?
-A: The shell creates a child process with fork(), and before calling exec(), it closes the standard output and opens the specified output file. As a result, any output from the soon-to-be-running program is sent to the file instead of the screen.
+Q: The separation of fork() and exec() allows for output redirection, such as in the example where the output of the program wc is redirected into the output file newfile.txt by closing ___ and opening the file newfile.txt before calling exec().
+A: standard output
 
-Q: How are UNIX pipes implemented, and what is their purpose?
-A: UNIX pipes are implemented using the pipe() system call. They connect the output of one process to an in-kernel pipe (queue) and the input of another process to the same pipe, allowing the output of one process to be seamlessly used as input to the next and enabling long and useful chains of commands to be created.
+Q: UNIX pipes are implemented with the ___ system call, connecting the output of one process to an in-kernel pipe and the input of another process to that same pipe, enabling seamless data transfer between processes.
+A: pipe()
 
 5.5
 
-Q: What is the purpose of the kill() system call in UNIX systems?
-A: The kill() system call is used to send signals to a process, including directives to pause, die, and other useful imperatives.
+Q: The ___ system call in UNIX systems is used to send signals to a process, including directives to pause, die, and other useful imperatives, with certain keystroke combinations in UNIX shells configured to deliver specific signals.
+A: kill()
 
-Q: How is the security and usability of a multi-user system maintained in UNIX systems?
-A: UNIX systems have a strong conception of the notion of a user. Users log in with credentials and can only control their own processes, while the operating system parcels out resources (such as CPU, memory, and disk) to each user and their processes to meet overall system goals.
+Q: In order to use the signal communication system effectively, a process should use the ___ system call to "catch" various signals, ensuring that when a signal is delivered, the process will suspend its normal execution and run a specific piece of code in response.
+A: signal()
 
-Q: What are man pages and why are they important for systems programmers?
-A: Man pages are the original form of documentation on UNIX systems, created before the web existed. Reading man pages is a key step in the growth of a systems programmer, as they contain useful information about system calls, shells, and potential errors or return values.
+Q: In modern systems, the operating system manages resources such as CPU, memory, and disk for each ___, who can launch processes and exercise full control over them, while only controlling their own processes to maintain usability and security.
+A: user
 
-5.6
+Q: The command-line tool ___ allows you to see which processes are running on your system, while the tool top displays the processes and their resource usage.
+A: ps
 
-Q: What command allows you to see which processes are running in UNIX systems?
-A: The "ps" command allows you to see which processes are running in UNIX systems.
+Q: The command ___ can be used to send arbitrary signals to processes, while the slightly more user-friendly killall serves a similar purpose.
+A: kill
 
-Q: What is the purpose of the "top" command in UNIX systems?
-A: The "top" command displays the processes of the system and how much CPU and other resources they are consuming.
+Q: In UNIX-based systems, the ___ is a user with special abilities for system administration, including the power to kill arbitrary processes and run powerful commands like shutdown.
+A: superuser (root)
 
-Q: What is the role of the superuser (root) in UNIX-based systems?
-A: In UNIX-based systems, the superuser (root) has special abilities, such as killing arbitrary processes and running powerful commands like shutdown. The superuser can administer the system without the limitations of regular users.
+
+
+CHAPTER 6
+
+Q: The operating system virtualizes the CPU by implementing a set of techniques called ___ which involve running the program on the CPU with hardware limitations to maintain control and efficiency.
+A: limited direct execution
+
+Q: In the context of CPU virtualization, the operating system "baby proofs" the CPU by setting up ___ and starting an ___ during boot time, and running processes in a restricted mode.
+A: trap handlers, interrupt timer
+
+Q: The ___ must determine which process to run at a given time in order to manage the virtualized CPU efficiently.
+A: scheduler
+
+6.1
+
+Q: The technique called ___ involves running a program directly on the CPU to achieve efficient execution while the OS sets limits to maintain control and implement time-sharing for CPU virtualization.
+A: limited direct execution
+
+Q: To virtualize the CPU, the operating system faces two main challenges: ensuring the program doesn't perform unwanted actions while running efficiently, and ___ while implementing time-sharing.
+A: stopping the process and switching to another process
+
+Q: The "limited" part of the name "limited direct execution" comes from the need to impose ___ on running programs to maintain control and achieve efficient CPU virtualization.
+A: limits
+
+6.2
+
+Q: The hardware assists the OS by providing two different modes of execution, ___ and ___, to control access to hardware resources and allow secure interaction with the operating system.
+A: user mode, kernel mode
+
+Q: When a user process wants to perform a privileged operation, it uses a ___ which is a hardware-provided mechanism to execute code in kernel mode and access privileged resources.
+A: system call
+
+Q: System calls are assigned a ___ which serves as a form of protection, as the user code cannot specify an exact address to jump to in the kernel but must request a particular service through this number.
+A: system-call number
+
+6.3
+
+Q: One approach to switching between processes in an operating system is the ___ approach, where the OS trusts processes to periodically give up the CPU, and the OS regains control through system calls or illegal operations.
+A: cooperative
+
+Q: In a non-cooperative approach to process switching, a ___ interrupt can be used to regain control of the CPU, allowing the OS to stop the current process and start a different one.
+A: timer
+
+Q: The OS executes a ___ ___ to save a few register values for the currently-executing process and restore a few for the soon-to-be-executing process, allowing it to switch between processes.
+A: context switch
+
+6.4
+
+Q: One approach to switching between processes in an operating system is the ___ approach, where the OS trusts processes to periodically give up the CPU, and the OS regains control through system calls or illegal operations.
+A: cooperative
+
+Q: In a non-cooperative approach to process switching, a ___ interrupt can be used to regain control of the CPU, allowing the OS to stop the current process and start a different one.
+A: timer
+
+Q: The OS executes a ___ ___ to save a few register values for the currently-executing process and restore a few for the soon-to-be-executing process, allowing it to switch between processes.
+A: context switch
+
+
+
+CHAPTER 7
+
+Q: The high-level policies that an OS scheduler employs are also known as ___.
+A: scheduling disciplines
+
+Q: The first family of scheduling approaches optimizes ___ time by running the shortest job remaining.
+A: turnaround
+
+Q: The second family of scheduling approaches optimizes ___ time by alternating between all jobs.
+A: response
+
+7.1
+
+Q: The workload assumptions made for scheduling include each job running for the same amount of time, all jobs arriving at the same time, each job running to completion once started, all jobs only using the ___, and the run-time of each job is known.
+A: CPU
+
+Q: One of the most unrealistic workload assumptions is that the ___ of each job is known.
+A: run-time
+
+Q: Workload assumptions help in building more fine-tuned ___ policies.
+A: scheduling
+
+7.2
+
+Q: The ___ time of a job is defined as the time at which the job completes minus the time at which the job arrived in the system.
+A: turnaround
+
+Q: In scheduling, there are often trade-offs between performance and ___.
+A: fairness
+
+Q: Turnaround time is a ___ metric used to compare different scheduling policies.
+A: performance
+
+7.3
+
+Q: The most basic scheduling algorithm, known as ___ or sometimes First Come, First Served (FCFS), places jobs in the order they arrive.
+A: First In, First Out (FIFO)
+
+Q: When jobs of different lengths are queued behind a long-running job in a FIFO scheduling system, it is referred to as the ___ effect.
+A: convoy
+
+Q: The scheduling principle ___ represents a general approach that can be applied to any system where perceived turnaround time per customer or job matters.
+A: Shortest Job First (SJF)
+
+7.4
+
+Q: The scheduling discipline known as ___ runs the shortest job first, then the next shortest, and so on.
+A: Shortest Job First (SJF)
+
+Q: With SJF, when jobs can arrive at any time instead of all at once, they may still suffer from the ___ problem.
+A: convoy
+
+Q: Modern schedulers are typically ___ and willing to stop one process from running in order to run another, which implies employing mechanisms such as context switches.
+A: preemptive
+
+7.5
+
+Q: The ___ scheduler adds preemption to Shortest Job First, determining which remaining job has the least time left and scheduling that one.
+A: Shortest Time-to-Completion First (STCF)
+
+Q: In STCF, any time a new job enters the system, the scheduler determines which of the remaining jobs, including the new job, has the ___ and schedules that one.
+A: least time left
+
+Q: Given the new assumptions, STCF is considered ___ in terms of average turnaround time.
+A: provably optimal
+
+7.6
+
+Q: Response time is defined as the time from when the job arrives in a system to the ___.
+A: first time it is scheduled
+
+Q: The response time metric is particularly important for ___ performance in time-shared machines.
+A: interactive
+
+Q: While STCF is great for turnaround time, it is quite ___ for response time and interactivity.
+A: bad
+
+7.7
+
+Q: The Round-Robin (RR) scheduling algorithm runs a job for a ___ and then switches to the next job in the run queue.
+A: time slice
+
+Q: The length of the time slice in RR scheduling is critical because it presents a trade-off between ___ and overall performance.
+A: response time
+
+Q: Round-Robin scheduling is an excellent scheduler for ___ but performs poorly when considering turnaround time.
+A: response time
+
+7.8
+
+Q: When a job initiates an I/O request, the currently-running job won't be using the CPU during the I/O, so the scheduler should ___.
+A: schedule another job
+
+Q: A common approach for schedulers to account for I/O is to treat each CPU burst of a job as ___.
+A: an independent job
+
+Q: Incorporating I/O into scheduling allows for ___ between CPU usage and I/O, leading to better system utilization.
+A: overlap
+
+7.9
+
+Q: The final assumption discussed is that the scheduler knows the ___ of each job, which is an unrealistic assumption for general-purpose operating systems.
+A: length
+
+Q: To build an approach that behaves like SJF/STCF without prior knowledge of job lengths, we need to incorporate some ideas from the ___ scheduler to improve response time.
+A: RR
+
+
+
+CHAPTER 8
+
+Q: The Multi-Level Feedback Queue (MLFQ) scheduler aims to optimize ___ and minimize ___ for interactive users without a priori knowledge of job length.
+A: turnaround time, response time
+
+Q: In MLFQ, when a job enters the system, it is placed at the ___ priority.
+A: highest
+
+Q: After a time period S in MLFQ, all the jobs in the system are moved to the ___ queue.
+A: topmost
+
+8.1
+
+Q: The key to MLFQ scheduling lies in how the scheduler sets ___ based on a job's observed behavior.
+A: priorities
+
+Q: In MLFQ, if Priority(A) > Priority(B), ___ runs and ___ doesn't.
+A: A, B
+
+Q: In MLFQ, if Priority(A) = Priority(B), A and B run in ___.
+A: RR (Round-Robin)
+
+8.2
+
+Q: When a job enters the system in MLFQ, it is placed at the ___ priority.
+A: highest
+
+Q: In MLFQ, if a job uses up an entire time slice while running, its priority is ___.
+A: reduced
+
+Q: In MLFQ, if a job gives up the CPU before the time slice is up, it stays at the ___ priority level.
+A: same
+
+8.3
+
+Q: In MLFQ, to avoid starvation and allow CPU-bound jobs to make progress, a ___ is applied to periodically move all jobs to the topmost queue.
+A: priority boost
+
+Q: The priority boost in MLFQ solves two problems: preventing ___ and ensuring proper treatment of CPU-bound jobs that become interactive.
+A: starvation
+
+Q: In MLFQ, the time period S used for priority boosting is a challenge to set correctly because it can affect the performance of long-running and interactive jobs. John Ousterhout called such values ___.
+A: voo-doo constants
+
+8.4
+
+Q: In MLFQ, to prevent gaming of the scheduler, the system keeps track of CPU time at each level and demotes a process once it has used up its time allotment, regardless of how many times it has given up the CPU. This new rule replaces Rules 4a and 4b and is called ___.
+A: Rule 4
+
+Q: The purpose of Rule 4 in MLFQ is to prevent a process from retaining its priority by ___ the CPU before the time slice expires, thus gaming the scheduler.
+A: relinquishing
+
+Q: With Rule 4 in MLFQ, a process that tries to game the scheduler by issuing I/O just before a time slice ends will still be ___ down the queues, ensuring it cannot gain an unfair share of the CPU.
+A: demoted
+
+8.5
+
+Q: In MLFQ scheduling, high-priority queues typically have ___ time slices, while low-priority queues have ___ time slices to accommodate the different types of jobs in each queue.
+A: short, longer
+
+Q: One way to avoid voo-doo constants in MLFQ scheduling is to provide a ___ file with default parameter values that can be tweaked by a seasoned administrator when necessary.
+A: configuration
+
+Q: In some systems, users can provide ___ to help set priorities for their jobs, which the operating system may take into account when making scheduling decisions.
+A: advice
